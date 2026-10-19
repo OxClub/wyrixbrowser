@@ -6,6 +6,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.wyrix.browser.browser.engine.GeckoViewHost
 import com.wyrix.browser.browser.viewmodel.BrowserViewModel
+import com.wyrix.browser.core.preferences.ToolbarPosition
+import com.wyrix.browser.core.preferences.TrackingLevel
 import com.wyrix.browser.ui.components.*
 
 @Composable
@@ -20,51 +22,48 @@ fun BrowserScreen(
     val activeTab by viewModel.activeTab.collectAsState()
     val allTabs by viewModel.tabs.collectAsState()
     val currentWorkspace by viewModel.currentWorkspace.collectAsState()
-    val shieldEnabled by viewModel.shieldEnabled.collectAsState()
     val desktopMode by viewModel.desktopMode.collectAsState()
-    val selectedEngine by viewModel.selectedEngine.collectAsState()
+    val prefs by viewModel.preferences.collectAsState()
 
     var showCommandCenter by remember { mutableStateOf(false) }
     var showControlCenter by remember { mutableStateOf(false) }
 
-    val commands = listOf(
-        WyrixCommand("New Tab", "Navigation") { viewModel.createNewTab() },
-        WyrixCommand("New Private Tab", "Privacy") { viewModel.createNewTab(isPrivate = true) },
-        WyrixCommand("Go to Home", "Navigation") { viewModel.goHome() },
-        WyrixCommand("Reload Page", "Navigation") { viewModel.reload() },
-        WyrixCommand("Toggle Wyrix Shield", "Security") { viewModel.toggleShield() },
-        WyrixCommand("Toggle Desktop Mode", "Display") { viewModel.toggleDesktopMode() },
-        WyrixCommand("Bookmark Current Page", "Bookmarks") { viewModel.bookmarkCurrentPage() },
-        WyrixCommand("View Bookmarks", "Saved") { onOpenBookmarks() },
-        WyrixCommand("View History", "Saved") { onOpenHistory() },
-        WyrixCommand("Downloads", "Storage") { onOpenDownloads() },
-        WyrixCommand("Browser Settings", "Config") { onOpenSettings() }
-    )
+    val toolbarContent: @Composable () -> Unit = {
+        BrowserToolbar(
+            url = activeTab?.url.orEmpty(),
+            progress = activeTab?.progress ?: 0,
+            isSecure = activeTab?.isSecure ?: true,
+            tabCount = allTabs.size,
+            shieldActive = prefs.trackingLevel != TrackingLevel.OFF,
+            onNavigate = { viewModel.navigateTo(it) },
+            onGoHome = { viewModel.goHome() },
+            onOpenTabs = onOpenTabs,
+            onOpenControlCenter = { showControlCenter = true },
+            onToggleShield = {
+                viewModel.setTrackingProtection(
+                    if (prefs.trackingLevel == TrackingLevel.OFF) TrackingLevel.STRICT else TrackingLevel.OFF
+                )
+            },
+            onOpenCommandCenter = { showCommandCenter = true }
+        )
+    }
 
     Scaffold(
         topBar = {
-            BrowserToolbar(
-                url = activeTab?.url.orEmpty(),
-                progress = activeTab?.progress ?: 0,
-                isSecure = activeTab?.isSecure ?: true,
-                tabCount = allTabs.size,
-                shieldActive = shieldEnabled,
-                onNavigate = { viewModel.navigateTo(it) },
-                onGoHome = { viewModel.goHome() },
-                onOpenTabs = onOpenTabs,
-                onOpenControlCenter = { showControlCenter = true },
-                onToggleShield = { viewModel.toggleShield() },
-                onOpenCommandCenter = { showCommandCenter = true }
-            )
+            if (prefs.toolbarPosition == ToolbarPosition.TOP) {
+                toolbarContent()
+            }
+        },
+        bottomBar = {
+            if (prefs.toolbarPosition == ToolbarPosition.BOTTOM) {
+                toolbarContent()
+            }
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             val sessionHolder = activeTab?.id?.let { viewModel.getSession(it) }
             val currentUrl = activeTab?.url.orEmpty()
 
-            // Surface Conflict Resolution:
-            // Jab koi URL search kiya gaya ho to GeckoView dikhega.
-            // Jab URL khali ho to HomeScreen dikhega. Dono ko ek sath stack nahi karenge.
             if (currentUrl.isNotBlank() && currentUrl != "about:blank") {
                 if (sessionHolder != null) {
                     GeckoViewHost(
@@ -75,9 +74,9 @@ fun BrowserScreen(
             } else {
                 HomeScreen(
                     currentWorkspace = currentWorkspace,
-                    shieldActive = shieldEnabled,
-                    selectedEngine = selectedEngine,
-                    onSelectEngine = { viewModel.setSelectedEngine(it) },
+                    shieldActive = prefs.trackingLevel != TrackingLevel.OFF,
+                    selectedEngine = prefs.searchEngine,
+                    onSelectEngine = { viewModel.setSearchEngine(it) },
                     onNavigate = { query, engine -> viewModel.navigateTo(query, engine) },
                     onSwitchWorkspace = { viewModel.switchWorkspace(it) }
                 )
@@ -88,16 +87,28 @@ fun BrowserScreen(
     WyrixCommandCenter(
         isOpen = showCommandCenter,
         onDismiss = { showCommandCenter = false },
-        commands = commands
+        commands = listOf(
+            WyrixCommand("New Tab", "Navigation") { viewModel.createNewTab() },
+            WyrixCommand("New Private Tab", "Privacy") { viewModel.createNewTab(isPrivate = true) },
+            WyrixCommand("Go to Home", "Navigation") { viewModel.goHome() },
+            WyrixCommand("Reload Page", "Navigation") { viewModel.reload() },
+            WyrixCommand("Toggle Desktop Mode", "Display") { viewModel.toggleDesktopMode() },
+            WyrixCommand("Bookmark Page", "Bookmarks") { viewModel.bookmarkCurrentPage() },
+            WyrixCommand("Open Settings", "Config") { onOpenSettings() }
+        )
     )
 
     WyrixControlCenterSheet(
         isOpen = showControlCenter,
         onDismiss = { showControlCenter = false },
         desktopMode = desktopMode,
-        shieldActive = shieldEnabled,
+        shieldActive = prefs.trackingLevel != TrackingLevel.OFF,
         onToggleDesktop = { viewModel.toggleDesktopMode() },
-        onToggleShield = { viewModel.toggleShield() },
+        onToggleShield = {
+            viewModel.setTrackingProtection(
+                if (prefs.trackingLevel == TrackingLevel.OFF) TrackingLevel.STRICT else TrackingLevel.OFF
+            )
+        },
         onOpenBookmarks = onOpenBookmarks,
         onOpenHistory = onOpenHistory,
         onOpenDownloads = onOpenDownloads,

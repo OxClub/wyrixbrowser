@@ -1,9 +1,9 @@
 package com.wyrix.browser
 
 import android.os.Bundle
-import androidx.activity.viewModels
-import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.runtime.*
 import androidx.fragment.app.FragmentActivity
 import com.wyrix.browser.browser.viewmodel.BrowserViewModel
@@ -28,8 +28,6 @@ class MainActivity : FragmentActivity() {
                 val tabs by viewModel.tabs.collectAsState()
                 val activeTabId by viewModel.activeTabId.collectAsState()
                 val currentWorkspace by viewModel.currentWorkspace.collectAsState()
-                val shieldActive by viewModel.shieldEnabled.collectAsState()
-                val desktopMode by viewModel.desktopMode.collectAsState()
 
                 val bookmarks by viewModel.bookmarks.collectAsState(initial = emptyList())
                 val history by viewModel.history.collectAsState(initial = emptyList())
@@ -99,11 +97,7 @@ class MainActivity : FragmentActivity() {
                     }
                     Screen.SETTINGS -> {
                         SettingsScreen(
-                            shieldActive = shieldActive,
-                            desktopMode = desktopMode,
-                            onToggleShield = { viewModel.toggleShield() },
-                            onToggleDesktop = { viewModel.toggleDesktopMode() },
-                            onClearData = { viewModel.clearAllHistory() },
+                            viewModel = viewModel,
                             onBack = { currentScreen = Screen.BROWSER }
                         )
                     }

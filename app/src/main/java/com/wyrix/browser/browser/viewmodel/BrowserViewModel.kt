@@ -3,10 +3,12 @@ package com.wyrix.browser.browser.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.wyrix.browser.browser.engine.WyrixGeckoRuntime
 import com.wyrix.browser.browser.engine.WyrixSessionHolder
 import com.wyrix.browser.browser.model.TabModel
 import com.wyrix.browser.browser.model.Workspace
 import com.wyrix.browser.core.database.*
+import com.wyrix.browser.core.preferences.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.mozilla.geckoview.GeckoSessionSettings
@@ -17,6 +19,10 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     private val db = WyrixDatabase.getInstance(application)
     private val dao = db.browserDao()
+    private val prefsRepo = WyrixPreferencesRepository(application)
+
+    val preferences: StateFlow<WyrixPreferences> = prefsRepo.preferencesFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, WyrixPreferences())
 
     private val sessionPool = mutableMapOf<String, WyrixSessionHolder>()
 
@@ -29,14 +35,8 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     private val _currentWorkspace = MutableStateFlow(Workspace.PERSONAL)
     val currentWorkspace: StateFlow<Workspace> = _currentWorkspace.asStateFlow()
 
-    private val _shieldEnabled = MutableStateFlow(true)
-    val shieldEnabled: StateFlow<Boolean> = _shieldEnabled.asStateFlow()
-
     private val _desktopMode = MutableStateFlow(false)
     val desktopMode: StateFlow<Boolean> = _desktopMode.asStateFlow()
-
-    private val _selectedEngine = MutableStateFlow("Google")
-    val selectedEngine: StateFlow<String> = _selectedEngine.asStateFlow()
 
     val bookmarks: Flow<List<BookmarkEntity>> = dao.getAllBookmarks()
     val history: Flow<List<HistoryEntity>> = dao.getAllHistory()
@@ -47,34 +47,39 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
+        // Observe and apply engine settings live
+        viewModelScope.launch {
+            preferences.collect { p ->
+                WyrixGeckoRuntime.applyTrackingProtection(getApplication(), p.trackingLevel)
+                WyrixGeckoRuntime.applyCookiePolicy(getApplication(), p.cookiePolicy)
+                WyrixGeckoRuntime.applyJavaScript(getApplication(), p.javaScriptEnabled)
+            }
+        }
+
         viewModelScope.launch {
             try {
-                dao.getNormalTabs().firstOrNull()?.let { savedTabs ->
-                    val validTabs = savedTabs.filter { it.url.isNotBlank() && it.url != "about:blank" }
-                    if (validTabs.isNotEmpty()) {
-                        validTabs.forEach { tabEntity ->
-                            createTabInternal(
-                                id = tabEntity.id,
-                                url = tabEntity.url,
-                                isPrivate = false,
-                                workspace = try { Workspace.valueOf(tabEntity.workspaceId) } catch (e: Exception) { Workspace.PERSONAL }
-                            )
+                if (preferences.value.restoreSessionOnStartup) {
+                    dao.getNormalTabs().firstOrNull()?.let { savedTabs ->
+                        val validTabs = savedTabs.filter { it.url.isNotBlank() && it.url != "about:blank" }
+                        if (validTabs.isNotEmpty()) {
+                            validTabs.forEach { tabEntity ->
+                                createTabInternal(
+                                    id = tabEntity.id,
+                                    url = tabEntity.url,
+                                    isPrivate = false,
+                                    workspace = try { Workspace.valueOf(tabEntity.workspaceId) } catch (e: Exception) { Workspace.PERSONAL }
+                                )
+                            }
+                            _activeTabId.value = validTabs.first().id
+                            return@launch
                         }
-                        _activeTabId.value = validTabs.first().id
-                    } else {
-                        createNewTab(url = "", isPrivate = false)
                     }
-                } ?: run {
-                    createNewTab(url = "", isPrivate = false)
                 }
+                createNewTab(url = "", isPrivate = false)
             } catch (e: Exception) {
                 createNewTab(url = "", isPrivate = false)
             }
         }
-    }
-
-    fun setSelectedEngine(engine: String) {
-        _selectedEngine.value = engine
     }
 
     fun getSession(tabId: String): WyrixSessionHolder? = sessionPool[tabId]
@@ -128,10 +133,12 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { dao.deleteTabById(tabId) }
     }
 
-    fun navigateTo(input: String, engine: String = _selectedEngine.value) {
+    fun navigateTo(input: String, overrideEngine: String? = null) {
         val currentId = _activeTabId.value ?: return
         val trimmed = input.trim()
         if (trimmed.isEmpty()) return
+
+        val engine = overrideEngine ?: preferences.value.searchEngine
 
         val formattedUrl = when {
             trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
@@ -142,6 +149,12 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                     "google" -> "https://www.google.com/search?q=$query"
                     "brave" -> "https://search.brave.com/search?q=$query"
                     "bing" -> "https://www.bing.com/search?q=$query"
+                    "startpage" -> "https://www.startpage.com/sp/search?query=$query"
+                    "custom" -> {
+                        val template = preferences.value.customSearchUrl
+                        if (template.contains("%s")) template.replace("%s", query)
+                        else "https://duckduckgo.com/?q=$query"
+                    }
                     else -> "https://duckduckgo.com/?q=$query"
                 }
             }
@@ -162,7 +175,6 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun switchWorkspace(workspace: Workspace) { _currentWorkspace.value = workspace }
-    fun toggleShield() { _shieldEnabled.update { !it } }
 
     fun toggleDesktopMode() {
         _desktopMode.update { !it }
@@ -176,11 +188,6 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         session.reload()
     }
 
-    fun findInPage(text: String) {
-        val currentId = _activeTabId.value ?: return
-        sessionPool[currentId]?.session?.finder?.find(text, 0)
-    }
-
     fun bookmarkCurrentPage() {
         val current = activeTab.value ?: return
         if (current.url.isBlank()) return
@@ -189,17 +196,45 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun deleteBookmark(bookmark: BookmarkEntity) {
-        viewModelScope.launch { dao.deleteBookmark(bookmark) }
+    fun deleteBookmark(bookmark: BookmarkEntity) { viewModelScope.launch { dao.deleteBookmark(bookmark) } }
+    fun deleteHistoryItem(id: Long) { viewModelScope.launch { dao.deleteHistory(id) } }
+    fun clearAllHistory() { viewModelScope.launch { dao.clearHistory() } }
+
+    fun clearCompleteEngineData() {
+        viewModelScope.launch {
+            dao.clearHistory()
+            _tabs.value.forEach { sessionPool[it.id]?.close() }
+            sessionPool.clear()
+            _tabs.value = emptyList()
+            createNewTab("", false)
+            WyrixGeckoRuntime.clearAllWebStorage(getApplication()) {}
+        }
     }
 
-    fun deleteHistoryItem(id: Long) {
-        viewModelScope.launch { dao.deleteHistory(id) }
-    }
-
-    fun clearAllHistory() {
-        viewModelScope.launch { dao.clearHistory() }
-    }
+    // Settings Mutators
+    fun setSearchEngine(eng: String) = viewModelScope.launch { prefsRepo.setSearchEngine(eng) }
+    fun setCustomSearchUrl(url: String) = viewModelScope.launch { prefsRepo.setCustomSearchUrl(url) }
+    fun setSearchSuggestions(enabled: Boolean) = viewModelScope.launch { prefsRepo.setSearchSuggestions(enabled) }
+    fun setToolbarPosition(pos: ToolbarPosition) = viewModelScope.launch { prefsRepo.setToolbarPosition(pos) }
+    fun setTrackingProtection(level: TrackingLevel) = viewModelScope.launch { prefsRepo.setTrackingLevel(level) }
+    fun setHttpsOnly(enabled: Boolean) = viewModelScope.launch { prefsRepo.setHttpsOnly(enabled) }
+    fun setDoNotTrack(enabled: Boolean) = viewModelScope.launch { prefsRepo.setDoNotTrack(enabled) }
+    fun setClearOnExit(enabled: Boolean) = viewModelScope.launch { prefsRepo.setClearOnExit(enabled) }
+    fun setBiometricLock(enabled: Boolean) = viewModelScope.launch { prefsRepo.setBiometricLock(enabled) }
+    fun setAutofill(enabled: Boolean) = viewModelScope.launch { prefsRepo.setAutofill(enabled) }
+    fun setTabViewStyle(style: TabViewStyle) = viewModelScope.launch { prefsRepo.setTabViewStyle(style) }
+    fun setRestoreSession(enabled: Boolean) = viewModelScope.launch { prefsRepo.setRestoreSession(enabled) }
+    fun setShowShortcuts(show: Boolean) = viewModelScope.launch { prefsRepo.setShowShortcuts(show) }
+    fun setShowShieldStats(show: Boolean) = viewModelScope.launch { prefsRepo.setShowShieldStats(show) }
+    fun setAppTheme(theme: AppTheme) = viewModelScope.launch { prefsRepo.setAppTheme(theme) }
+    fun setAccentColor(acc: AccentColorChoice) = viewModelScope.launch { prefsRepo.setAccentColor(acc) }
+    fun setTextZoom(percent: Int) = viewModelScope.launch { prefsRepo.setTextZoom(percent) }
+    fun setForceZoom(enabled: Boolean) = viewModelScope.launch { prefsRepo.setForceZoom(enabled) }
+    fun setJavaScript(enabled: Boolean) = viewModelScope.launch { prefsRepo.setJavaScript(enabled) }
+    fun setCookiePolicy(policy: CookiePolicy) = viewModelScope.launch { prefsRepo.setCookiePolicy(policy) }
+    fun setAppLanguage(lang: String) = viewModelScope.launch { prefsRepo.setAppLanguage(lang) }
+    fun setDownloadWifiOnly(wifiOnly: Boolean) = viewModelScope.launch { prefsRepo.setDownloadWifiOnly(wifiOnly) }
+    fun setAskDownloadLocation(ask: Boolean) = viewModelScope.launch { prefsRepo.setAskDownloadLocation(ask) }
 
     private fun handleUrlUpdate(tabId: String, url: String, isPrivate: Boolean) {
         if (url.isBlank() || url == "about:blank") return

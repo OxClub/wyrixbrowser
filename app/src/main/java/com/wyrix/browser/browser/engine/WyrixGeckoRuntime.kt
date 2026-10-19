@@ -1,7 +1,6 @@
 package com.wyrix.browser.browser.engine
 
 import android.content.Context
-import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoRuntimeSettings
 
@@ -17,13 +16,6 @@ object WyrixGeckoRuntime {
 
     private fun buildRuntime(context: Context): GeckoRuntime {
         val settings = GeckoRuntimeSettings.Builder()
-            .contentBlocking(
-                ContentBlocking.Settings.Builder()
-                    .antiTracking(ContentBlocking.AntiTracking.STRICT)
-                    .enhancedTrackingProtectionLevel(ContentBlocking.EtpLevel.STRICT)
-                    .cookieBehavior(ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS)
-                    .build()
-            )
             .javaScriptEnabled(true)
             .consoleOutput(false)
             .build()

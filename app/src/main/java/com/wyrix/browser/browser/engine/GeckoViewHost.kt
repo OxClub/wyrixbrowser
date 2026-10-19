@@ -19,8 +19,15 @@ fun GeckoViewHost(
         },
         update = { view ->
             if (view.session != session) {
-                view.releaseSession()
+                if (view.session != null) {
+                    view.releaseSession()
+                }
                 session?.let { view.setSession(it) }
+            }
+        },
+        onRelease = { view ->
+            if (view.session != null) {
+                view.releaseSession()
             }
         },
         modifier = modifier

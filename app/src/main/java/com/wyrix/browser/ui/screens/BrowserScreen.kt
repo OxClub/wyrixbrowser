@@ -6,9 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.wyrix.browser.browser.engine.GeckoViewHost
 import com.wyrix.browser.browser.viewmodel.BrowserViewModel
-import com.wyrix.browser.ui.components.BrowserToolbar
-import com.wyrix.browser.ui.components.WyrixCommand
-import com.wyrix.browser.ui.components.WyrixCommandCenter
+import com.wyrix.browser.ui.components.*
 
 @Composable
 fun BrowserScreen(
@@ -21,14 +19,18 @@ fun BrowserScreen(
 ) {
     val activeTab by viewModel.activeTab.collectAsState()
     val allTabs by viewModel.tabs.collectAsState()
+    val currentWorkspace by viewModel.currentWorkspace.collectAsState()
     val shieldEnabled by viewModel.shieldEnabled.collectAsState()
+    val desktopMode by viewModel.desktopMode.collectAsState()
 
     var showCommandCenter by remember { mutableStateOf(false) }
+    var showControlCenter by remember { mutableStateOf(false) }
 
     val commands = listOf(
         WyrixCommand("New Tab", "Navigation") { viewModel.createNewTab() },
         WyrixCommand("New Private Tab", "Privacy") { viewModel.createNewTab(isPrivate = true) },
         WyrixCommand("Toggle Wyrix Shield", "Security") { viewModel.toggleShield() },
+        WyrixCommand("Toggle Desktop Mode", "Display") { viewModel.toggleDesktopMode() },
         WyrixCommand("Bookmark Current Page", "Bookmarks") { viewModel.bookmarkCurrentPage() },
         WyrixCommand("View Bookmarks", "Saved") { onOpenBookmarks() },
         WyrixCommand("View History", "Saved") { onOpenHistory() },
@@ -46,7 +48,7 @@ fun BrowserScreen(
                 shieldActive = shieldEnabled,
                 onNavigate = { viewModel.navigateTo(it) },
                 onOpenTabs = onOpenTabs,
-                onOpenMenu = onOpenSettings,
+                onOpenControlCenter = { showControlCenter = true },
                 onToggleShield = { viewModel.toggleShield() },
                 onOpenCommandCenter = { showCommandCenter = true }
             )
@@ -54,13 +56,21 @@ fun BrowserScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             val sessionHolder = activeTab?.id?.let { viewModel.getSession(it) }
-            if (sessionHolder != null) {
+            val currentUrl = activeTab?.url.orEmpty()
+
+            // Agar URL khali hai ya koi specific search nahi hai to futuristic HomeScreen dikhayein
+            if (currentUrl.isBlank() || currentUrl == "about:blank") {
+                HomeScreen(
+                    currentWorkspace = currentWorkspace,
+                    shieldActive = shieldEnabled,
+                    onNavigate = { viewModel.navigateTo(it) },
+                    onSwitchWorkspace = { viewModel.switchWorkspace(it) }
+                )
+            } else if (sessionHolder != null) {
                 GeckoViewHost(
                     session = sessionHolder.session,
                     modifier = Modifier.fillMaxSize()
                 )
-            } else {
-                HomeScreen(onNavigate = { viewModel.navigateTo(it) })
             }
         }
     }
@@ -69,5 +79,18 @@ fun BrowserScreen(
         isOpen = showCommandCenter,
         onDismiss = { showCommandCenter = false },
         commands = commands
+    )
+
+    WyrixControlCenterSheet(
+        isOpen = showControlCenter,
+        onDismiss = { showControlCenter = false },
+        desktopMode = desktopMode,
+        shieldActive = shieldEnabled,
+        onToggleDesktop = { viewModel.toggleDesktopMode() },
+        onToggleShield = { viewModel.toggleShield() },
+        onOpenBookmarks = onOpenBookmarks,
+        onOpenHistory = onOpenHistory,
+        onOpenDownloads = onOpenDownloads,
+        onOpenSettings = onOpenSettings
     )
 }

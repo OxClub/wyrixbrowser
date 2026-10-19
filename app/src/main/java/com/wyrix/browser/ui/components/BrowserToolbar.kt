@@ -1,9 +1,11 @@
 package com.wyrix.browser.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -14,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -29,7 +32,7 @@ fun BrowserToolbar(
     shieldActive: Boolean,
     onNavigate: (String) -> Unit,
     onOpenTabs: () -> Unit,
-    onOpenMenu: () -> Unit,
+    onOpenControlCenter: () -> Unit,
     onToggleShield: () -> Unit,
     onOpenCommandCenter: () -> Unit
 ) {
@@ -41,38 +44,48 @@ fun BrowserToolbar(
             .fillMaxWidth()
             .background(WyrixBlack)
     ) {
+        // Glowing Neon Gradient Progress Bar
         if (progress in 1..99) {
-            LinearProgressIndicator(
-                progress = { progress / 100f },
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(2.dp),
-                color = WyrixNeonBlue,
-                trackColor = Color.Transparent
+                    .height(2.5.dp)
+                    .background(WyrixCyberGradient)
             )
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            IconButton(onClick = onToggleShield) {
-                Icon(
-                    imageVector = if (shieldActive) Icons.Default.Shield else Icons.Default.ShieldMoon,
-                    contentDescription = "Shield",
-                    tint = if (shieldActive) WyrixElectricGreen else WyrixAlertRed
-                )
+            // Shield Status Badge
+            Surface(
+                shape = CircleShape,
+                color = WyrixDarkSurface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (shieldActive) WyrixElectricGreen else WyrixAlertRed),
+                modifier = Modifier.size(36.dp).clickable { onToggleShield() }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (shieldActive) Icons.Default.Shield else Icons.Default.ShieldMoon,
+                        contentDescription = "Shield",
+                        tint = if (shieldActive) WyrixElectricGreen else WyrixAlertRed,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
 
+            // Cyber Omnibox
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp)
-                    .background(WyrixPanel, RoundedCornerShape(12.dp))
-                    .border(1.dp, WyrixBorder, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 8.dp),
+                    .background(WyrixPanel, RoundedCornerShape(14.dp))
+                    .border(1.dp, if (isEditing) WyrixNeonBlue else WyrixBorder, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 if (isEditing) {
@@ -95,14 +108,6 @@ fun BrowserToolbar(
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(
                                 onSearch = {
-                                    isEditing = false
-                                    if (text.isNotBlank()) onNavigate(text)
-                                },
-                                onGo = {
-                                    isEditing = false
-                                    if (text.isNotBlank()) onNavigate(text)
-                                },
-                                onDone = {
                                     isEditing = false
                                     if (text.isNotBlank()) onNavigate(text)
                                 }
@@ -134,13 +139,13 @@ fun BrowserToolbar(
                             imageVector = if (isSecure) Icons.Default.Lock else Icons.Default.LockOpen,
                             contentDescription = "Security",
                             tint = if (isSecure) WyrixNeonBlue else WyrixAlertRed,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(13.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (text.isBlank() || text == "about:blank") "Search or enter address" else text,
                             color = if (text.isBlank() || text == "about:blank") WyrixTextDisabled else WyrixTextPrimary,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -148,35 +153,38 @@ fun BrowserToolbar(
                 }
             }
 
-            IconButton(onClick = onOpenCommandCenter) {
-                Icon(
-                    imageVector = Icons.Default.Terminal,
-                    contentDescription = "Command Center",
-                    tint = WyrixNeonViolet
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(WyrixDarkSurface, RoundedCornerShape(8.dp))
-                    .border(1.dp, WyrixNeonBlue, RoundedCornerShape(8.dp))
-                    .clickable { onOpenTabs() },
-                contentAlignment = Alignment.Center
+            // Command Palette Button
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = WyrixPanel,
+                border = androidx.compose.foundation.BorderStroke(1.dp, WyrixBorder),
+                modifier = Modifier.size(36.dp).clickable { onOpenCommandCenter() }
             ) {
-                Text(
-                    text = tabCount.toString(),
-                    color = WyrixNeonBlue,
-                    fontSize = 12.sp
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Terminal, contentDescription = "Commands", tint = WyrixNeonViolet, modifier = Modifier.size(18.dp))
+                }
             }
 
-            IconButton(onClick = onOpenMenu) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Menu",
-                    tint = WyrixTextPrimary
-                )
+            // Tab Galaxy Counter
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = WyrixDarkSurface,
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, WyrixNeonBlue),
+                modifier = Modifier.size(36.dp).clickable { onOpenTabs() }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = tabCount.toString(),
+                        color = WyrixNeonBlue,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Futuristic Menu HUD Button
+            IconButton(onClick = onOpenControlCenter, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.DashboardCustomize, contentDescription = "Control Center", tint = WyrixTextPrimary, modifier = Modifier.size(20.dp))
             }
         }
     }

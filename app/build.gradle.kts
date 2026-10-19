@@ -17,6 +17,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        // सिर्फ आधुनिक 64-bit स्मार्टफोन्स (arm64-v8a) के लिए इंजन रखें
+        // इससे APK साइज 300MB से घटकर ~65MB हो जाएगा
+        ndk {
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     buildTypes {
@@ -59,7 +66,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.5")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
 
-    // Mozilla GeckoView Official Verified Release
     implementation("org.mozilla.geckoview:geckoview-omni:133.0.20241121140525")
 
     val roomVersion = "2.6.1"

@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.WyrixBrowser" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#05060A</item>
+        <item name="android:navigationBarColor">#05060A</item>
+    </style>
+</resources>

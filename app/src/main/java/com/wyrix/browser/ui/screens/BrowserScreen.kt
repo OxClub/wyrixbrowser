@@ -62,16 +62,17 @@ fun BrowserScreen(
             val sessionHolder = activeTab?.id?.let { viewModel.getSession(it) }
             val currentUrl = activeTab?.url.orEmpty()
 
-            // 1. GeckoView is always alive in background so surface is warm and ready
-            if (sessionHolder != null) {
-                GeckoViewHost(
-                    session = sessionHolder.session,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            // 2. If no URL is active, show the Futuristic HomeScreen HUD on top
-            if (currentUrl.isBlank() || currentUrl == "about:blank") {
+            // Surface Conflict Resolution:
+            // Jab koi URL search kiya gaya ho to GeckoView dikhega.
+            // Jab URL khali ho to HomeScreen dikhega. Dono ko ek sath stack nahi karenge.
+            if (currentUrl.isNotBlank() && currentUrl != "about:blank") {
+                if (sessionHolder != null) {
+                    GeckoViewHost(
+                        session = sessionHolder.session,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            } else {
                 HomeScreen(
                     currentWorkspace = currentWorkspace,
                     shieldActive = shieldEnabled,

@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSessionSettings
 
@@ -35,8 +36,6 @@ class WyrixSessionHolder(
         if (!session.isOpen) {
             session.open(WyrixGeckoRuntime.get(context))
         }
-        session.setActive(true)
-        session.setFocused(true)
     }
 
     private fun setupDelegates() {
@@ -56,7 +55,6 @@ class WyrixSessionHolder(
                 perms: List<GeckoSession.PermissionDelegate.ContentPermission>,
                 hasUserGesture: Boolean
             ) {
-                // about:blank ko ignore karein taaki black screen loop na bane
                 if (!url.isNullOrBlank() && url != "about:blank") {
                     onUrlChanged(url)
                 }
@@ -73,17 +71,15 @@ class WyrixSessionHolder(
             override fun onTitleChange(session: GeckoSession, title: String?) {
                 if (!title.isNullOrBlank()) onTitleChanged(title)
             }
-            override fun onCrash(session: GeckoSession) {
-                try {
-                    if (!session.isOpen) session.open(WyrixGeckoRuntime.get(context))
-                    session.setActive(true)
-                } catch (e: Exception) {}
-            }
-            override fun onKill(session: GeckoSession) {
-                try {
-                    if (!session.isOpen) session.open(WyrixGeckoRuntime.get(context))
-                    session.setActive(true)
-                } catch (e: Exception) {}
+        }
+
+        // YouTube aur baki websites ke liye Media aur Content Permissions grant karein taaki crash na ho
+        session.permissionDelegate = object : GeckoSession.PermissionDelegate {
+            override fun onContentPermissionRequest(
+                session: GeckoSession,
+                perm: GeckoSession.PermissionDelegate.ContentPermission
+            ): GeckoResult<Int> {
+                return GeckoResult.fromValue(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW)
             }
         }
     }
@@ -92,7 +88,6 @@ class WyrixSessionHolder(
         if (!session.isOpen) {
             session.open(WyrixGeckoRuntime.get(context))
         }
-        session.setActive(true)
         session.loadUri(uri)
     }
 

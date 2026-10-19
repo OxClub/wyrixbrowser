@@ -30,12 +30,6 @@ fun GeckoViewHost(
                     view.releaseSession()
                     view.setSession(session)
                 }
-                session.setActive(true)
-            } catch (e: Exception) {}
-        },
-        onRelease = { view ->
-            try {
-                view.releaseSession()
             } catch (e: Exception) {}
         },
         modifier = modifier

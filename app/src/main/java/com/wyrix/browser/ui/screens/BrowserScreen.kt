@@ -22,6 +22,7 @@ fun BrowserScreen(
     val currentWorkspace by viewModel.currentWorkspace.collectAsState()
     val shieldEnabled by viewModel.shieldEnabled.collectAsState()
     val desktopMode by viewModel.desktopMode.collectAsState()
+    val selectedEngine by viewModel.selectedEngine.collectAsState()
 
     var showCommandCenter by remember { mutableStateOf(false) }
     var showControlCenter by remember { mutableStateOf(false) }
@@ -29,6 +30,8 @@ fun BrowserScreen(
     val commands = listOf(
         WyrixCommand("New Tab", "Navigation") { viewModel.createNewTab() },
         WyrixCommand("New Private Tab", "Privacy") { viewModel.createNewTab(isPrivate = true) },
+        WyrixCommand("Go to Home", "Navigation") { viewModel.goHome() },
+        WyrixCommand("Reload Page", "Navigation") { viewModel.reload() },
         WyrixCommand("Toggle Wyrix Shield", "Security") { viewModel.toggleShield() },
         WyrixCommand("Toggle Desktop Mode", "Display") { viewModel.toggleDesktopMode() },
         WyrixCommand("Bookmark Current Page", "Bookmarks") { viewModel.bookmarkCurrentPage() },
@@ -47,6 +50,7 @@ fun BrowserScreen(
                 tabCount = allTabs.size,
                 shieldActive = shieldEnabled,
                 onNavigate = { viewModel.navigateTo(it) },
+                onGoHome = { viewModel.goHome() },
                 onOpenTabs = onOpenTabs,
                 onOpenControlCenter = { showControlCenter = true },
                 onToggleShield = { viewModel.toggleShield() },
@@ -58,18 +62,23 @@ fun BrowserScreen(
             val sessionHolder = activeTab?.id?.let { viewModel.getSession(it) }
             val currentUrl = activeTab?.url.orEmpty()
 
-            // Agar URL khali hai ya koi specific search nahi hai to futuristic HomeScreen dikhayein
+            // 1. GeckoView is always alive in background so surface is warm and ready
+            if (sessionHolder != null) {
+                GeckoViewHost(
+                    session = sessionHolder.session,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // 2. If no URL is active, show the Futuristic HomeScreen HUD on top
             if (currentUrl.isBlank() || currentUrl == "about:blank") {
                 HomeScreen(
                     currentWorkspace = currentWorkspace,
                     shieldActive = shieldEnabled,
-                    onNavigate = { viewModel.navigateTo(it) },
+                    selectedEngine = selectedEngine,
+                    onSelectEngine = { viewModel.setSelectedEngine(it) },
+                    onNavigate = { query, engine -> viewModel.navigateTo(query, engine) },
                     onSwitchWorkspace = { viewModel.switchWorkspace(it) }
-                )
-            } else if (sessionHolder != null) {
-                GeckoViewHost(
-                    session = sessionHolder.session,
-                    modifier = Modifier.fillMaxSize()
                 )
             }
         }

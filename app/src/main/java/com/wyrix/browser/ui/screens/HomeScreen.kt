@@ -37,21 +37,21 @@ data class QuickTile(val title: String, val url: String, val icon: String, val b
 fun HomeScreen(
     currentWorkspace: Workspace,
     shieldActive: Boolean,
-    onNavigate: (String) -> Unit,
+    selectedEngine: String,
+    onSelectEngine: (String) -> Unit,
+    onNavigate: (String, String) -> Unit,
     onSwitchWorkspace: (Workspace) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedEngine by remember { mutableStateOf("DuckDuckGo") }
-
-    val engines = listOf("DuckDuckGo", "Google", "Brave", "Bing")
+    val engines = listOf("Google", "DuckDuckGo", "Brave", "Bing")
 
     val quickTiles = listOf(
+        QuickTile("Google", "https://google.com", "🔍", "TOP"),
+        QuickTile("YouTube", "https://m.youtube.com", "▶️", "MEDIA"),
         QuickTile("GitHub", "https://github.com", "🐙", "DEV"),
         QuickTile("ChatGPT", "https://chatgpt.com", "🤖", "AI"),
-        QuickTile("DuckDuckGo", "https://duckduckgo.com", "🦆", "SEARCH"),
         QuickTile("Wikipedia", "https://wikipedia.org", "🌐", "WIKI"),
-        QuickTile("Reddit", "https://reddit.com", "👾", "FEED"),
-        QuickTile("YouTube", "https://youtube.com", "▶️", "MEDIA")
+        QuickTile("Reddit", "https://reddit.com", "👾", "FEED")
     )
 
     Column(
@@ -64,7 +64,6 @@ fun HomeScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Futuristic WYRIX Emblem
         Box(
             modifier = Modifier
                 .size(72.dp)
@@ -94,7 +93,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Futuristic Live Shield Status HUD Card
+        // Live Shield Card
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -130,7 +129,7 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (shieldActive) "Strict Anti-Tracking • Fingerprint Guard" else "Protection temporarily offline",
+                            text = if (shieldActive) "Strict Anti-Tracking • Necko Protected" else "Protection offline",
                             color = WyrixTextSecondary,
                             fontSize = 10.sp
                         )
@@ -155,7 +154,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Search Engine Selector Chips
+        // Search Engine Selection Row
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -166,7 +165,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(20.dp),
                     color = if (isSelected) WyrixNeonBlue else WyrixPanel,
                     border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) WyrixNeonBlue else WyrixBorder),
-                    modifier = Modifier.clickable { selectedEngine = engine }
+                    modifier = Modifier.clickable { onSelectEngine(engine) }
                 ) {
                     Text(
                         text = engine,
@@ -181,17 +180,17 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Center HUD Omnibox
+        // Center Omnibox
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search with $selectedEngine or type URL...", color = WyrixTextDisabled, fontSize = 13.sp) },
+            placeholder = { Text("Search with $selectedEngine or enter address...", color = WyrixTextDisabled, fontSize = 13.sp) },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = WyrixNeonBlue, modifier = Modifier.size(18.dp))
             },
             trailingIcon = {
                 if (searchQuery.isNotBlank()) {
-                    IconButton(onClick = { onNavigate(searchQuery) }) {
+                    IconButton(onClick = { onNavigate(searchQuery, selectedEngine) }) {
                         Icon(Icons.Default.ArrowForward, contentDescription = "Go", tint = WyrixNeonBlue)
                     }
                 }
@@ -211,13 +210,13 @@ fun HomeScreen(
             ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = {
-                if (searchQuery.isNotBlank()) onNavigate(searchQuery)
+                if (searchQuery.isNotBlank()) onNavigate(searchQuery, selectedEngine)
             })
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Workspaces Selector Dock
+        // Workspaces Selector
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -249,7 +248,6 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Quick Launch Grid
         Text(
             text = "NEURAL SHORTCUTS",
             fontSize = 11.sp,
@@ -273,7 +271,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .height(84.dp)
                         .border(1.dp, WyrixBorder, RoundedCornerShape(14.dp))
-                        .clickable { onNavigate(tile.url) },
+                        .clickable { onNavigate(tile.url, selectedEngine) },
                     colors = CardDefaults.cardColors(containerColor = WyrixCardBg),
                     shape = RoundedCornerShape(14.dp)
                 ) {

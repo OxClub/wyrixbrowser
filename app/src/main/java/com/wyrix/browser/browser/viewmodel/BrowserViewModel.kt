@@ -10,6 +10,7 @@ import com.wyrix.browser.core.database.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.mozilla.geckoview.GeckoSessionSettings
+import java.net.URLEncoder
 import java.util.UUID
 
 class BrowserViewModel(application: Application) : AndroidViewModel(application) {
@@ -33,6 +34,9 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     private val _desktopMode = MutableStateFlow(false)
     val desktopMode: StateFlow<Boolean> = _desktopMode.asStateFlow()
+
+    private val _selectedEngine = MutableStateFlow("Google")
+    val selectedEngine: StateFlow<String> = _selectedEngine.asStateFlow()
 
     val bookmarks: Flow<List<BookmarkEntity>> = dao.getAllBookmarks()
     val history: Flow<List<HistoryEntity>> = dao.getAllHistory()
@@ -58,20 +62,24 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                         }
                         _activeTabId.value = validTabs.first().id
                     } else {
-                        createNewTab("https://start.duckduckgo.com", isPrivate = false)
+                        createNewTab(url = "", isPrivate = false)
                     }
                 } ?: run {
-                    createNewTab("https://start.duckduckgo.com", isPrivate = false)
+                    createNewTab(url = "", isPrivate = false)
                 }
             } catch (e: Exception) {
-                createNewTab("https://start.duckduckgo.com", isPrivate = false)
+                createNewTab(url = "", isPrivate = false)
             }
         }
     }
 
+    fun setSelectedEngine(engine: String) {
+        _selectedEngine.value = engine
+    }
+
     fun getSession(tabId: String): WyrixSessionHolder? = sessionPool[tabId]
 
-    fun createNewTab(url: String = "https://start.duckduckgo.com", isPrivate: Boolean = false) {
+    fun createNewTab(url: String = "", isPrivate: Boolean = false) {
         val newId = UUID.randomUUID().toString()
         createTabInternal(newId, url, isPrivate, _currentWorkspace.value)
         _activeTabId.value = newId
@@ -88,18 +96,20 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
             onSecurityChanged = { isSecure -> updateTabSecurity(id, isSecure) }
         )
         sessionPool[id] = sessionHolder
-        sessionHolder.loadUri(url)
+        if (url.isNotBlank() && url != "about:blank") {
+            sessionHolder.loadUri(url)
+        }
 
         val newTab = TabModel(
             id = id,
-            title = "Loading...",
+            title = if (url.isBlank()) "New Tab" else "Loading...",
             url = url,
             isPrivate = isPrivate,
             workspace = workspace
         )
         _tabs.update { it + newTab }
 
-        if (!isPrivate) persistTab(newTab)
+        if (!isPrivate && url.isNotBlank()) persistTab(newTab)
     }
 
     fun selectTab(tabId: String) { _activeTabId.value = tabId }
@@ -112,18 +122,43 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         if (_activeTabId.value == tabId) {
             _activeTabId.value = remainingTabs.lastOrNull()?.id
         }
+        if (_tabs.value.isEmpty()) {
+            createNewTab(url = "", isPrivate = false)
+        }
         viewModelScope.launch { dao.deleteTabById(tabId) }
     }
 
-    fun navigateTo(url: String) {
+    fun navigateTo(input: String, engine: String = _selectedEngine.value) {
         val currentId = _activeTabId.value ?: return
-        val formattedUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            if (url.contains(".") && !url.contains(" ")) "https://$url"
-            else "https://duckduckgo.com/?q=${java.net.URLEncoder.encode(url, "UTF-8")}"
-        } else url
+        val trimmed = input.trim()
+        if (trimmed.isEmpty()) return
 
-        _tabs.update { list -> list.map { if (it.id == currentId) it.copy(url = formattedUrl) else it } }
+        val formattedUrl = when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            trimmed.contains(".") && !trimmed.contains(" ") -> "https://$trimmed"
+            else -> {
+                val query = URLEncoder.encode(trimmed, "UTF-8")
+                when (engine.lowercase()) {
+                    "google" -> "https://www.google.com/search?q=$query"
+                    "brave" -> "https://search.brave.com/search?q=$query"
+                    "bing" -> "https://www.bing.com/search?q=$query"
+                    else -> "https://duckduckgo.com/?q=$query"
+                }
+            }
+        }
+
+        _tabs.update { list -> list.map { if (it.id == currentId) it.copy(url = formattedUrl, title = "Loading...") else it } }
         sessionPool[currentId]?.loadUri(formattedUrl)
+    }
+
+    fun goHome() {
+        val currentId = _activeTabId.value ?: return
+        _tabs.update { list -> list.map { if (it.id == currentId) it.copy(url = "") else it } }
+    }
+
+    fun reload() {
+        val currentId = _activeTabId.value ?: return
+        sessionPool[currentId]?.reload()
     }
 
     fun switchWorkspace(workspace: Workspace) { _currentWorkspace.value = workspace }
@@ -148,6 +183,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     fun bookmarkCurrentPage() {
         val current = activeTab.value ?: return
+        if (current.url.isBlank()) return
         viewModelScope.launch {
             dao.insertBookmark(BookmarkEntity(title = current.title, url = current.url))
         }
@@ -166,7 +202,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun handleUrlUpdate(tabId: String, url: String, isPrivate: Boolean) {
-        if (url == "about:blank") return
+        if (url.isBlank() || url == "about:blank") return
         _tabs.update { list -> list.map { if (it.id == tabId) it.copy(url = url) else it } }
         if (!isPrivate) {
             viewModelScope.launch {
@@ -177,6 +213,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun updateTabTitle(tabId: String, title: String) {
+        if (title.isBlank()) return
         _tabs.update { list -> list.map { if (it.id == tabId) it.copy(title = title) else it } }
     }
 
@@ -189,7 +226,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun persistTab(tab: TabModel) {
-        if (tab.url == "about:blank") return
+        if (tab.url.isBlank() || tab.url == "about:blank") return
         viewModelScope.launch {
             try {
                 dao.insertOrUpdateTab(

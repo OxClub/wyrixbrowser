@@ -1,6 +1,5 @@
 package com.wyrix.browser.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +30,7 @@ fun BrowserToolbar(
     tabCount: Int,
     shieldActive: Boolean,
     onNavigate: (String) -> Unit,
+    onGoHome: () -> Unit,
     onOpenTabs: () -> Unit,
     onOpenControlCenter: () -> Unit,
     onToggleShield: () -> Unit,
@@ -44,7 +44,6 @@ fun BrowserToolbar(
             .fillMaxWidth()
             .background(WyrixBlack)
     ) {
-        // Glowing Neon Gradient Progress Bar
         if (progress in 1..99) {
             Box(
                 modifier = Modifier
@@ -57,28 +56,16 @@ fun BrowserToolbar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Shield Status Badge
-            Surface(
-                shape = CircleShape,
-                color = WyrixDarkSurface,
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (shieldActive) WyrixElectricGreen else WyrixAlertRed),
-                modifier = Modifier.size(36.dp).clickable { onToggleShield() }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (shieldActive) Icons.Default.Shield else Icons.Default.ShieldMoon,
-                        contentDescription = "Shield",
-                        tint = if (shieldActive) WyrixElectricGreen else WyrixAlertRed,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+            // Home Button
+            IconButton(onClick = onGoHome, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Home, contentDescription = "Home", tint = WyrixNeonBlue, modifier = Modifier.size(20.dp))
             }
 
-            // Cyber Omnibox
+            // Omnibox
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -153,7 +140,7 @@ fun BrowserToolbar(
                 }
             }
 
-            // Command Palette Button
+            // Command Palette
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = WyrixPanel,
@@ -165,7 +152,7 @@ fun BrowserToolbar(
                 }
             }
 
-            // Tab Galaxy Counter
+            // Tab Counter
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = WyrixDarkSurface,
@@ -182,7 +169,7 @@ fun BrowserToolbar(
                 }
             }
 
-            // Futuristic Menu HUD Button
+            // Control Center
             IconButton(onClick = onOpenControlCenter, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.DashboardCustomize, contentDescription = "Control Center", tint = WyrixTextPrimary, modifier = Modifier.size(20.dp))
             }

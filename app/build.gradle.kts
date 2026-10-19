@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.wyrix.browser"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.wyrix.browser"
         minSdk = 28
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
 
@@ -59,7 +59,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.5")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
 
-    implementation("org.mozilla.geckoview:geckoview-omni:130.0.20240829045323")
+    // Mozilla GeckoView Official Verified Release
+    implementation("org.mozilla.geckoview:geckoview-omni:133.0.20241121140525")
 
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")

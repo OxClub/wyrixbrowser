@@ -35,6 +35,8 @@ class WyrixSessionHolder(
         if (!session.isOpen) {
             session.open(WyrixGeckoRuntime.get(context))
         }
+        session.setActive(true)
+        session.setFocused(true)
     }
 
     private fun setupDelegates() {
@@ -54,7 +56,10 @@ class WyrixSessionHolder(
                 perms: List<GeckoSession.PermissionDelegate.ContentPermission>,
                 hasUserGesture: Boolean
             ) {
-                url?.let { onUrlChanged(it) }
+                // about:blank ko ignore karein taaki black screen loop na bane
+                if (!url.isNullOrBlank() && url != "about:blank") {
+                    onUrlChanged(url)
+                }
             }
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
                 _canGoBack.value = canGoBack
@@ -66,22 +71,31 @@ class WyrixSessionHolder(
 
         session.contentDelegate = object : GeckoSession.ContentDelegate {
             override fun onTitleChange(session: GeckoSession, title: String?) {
-                title?.let { onTitleChanged(it) }
+                if (!title.isNullOrBlank()) onTitleChanged(title)
             }
             override fun onCrash(session: GeckoSession) {
                 try {
                     if (!session.isOpen) session.open(WyrixGeckoRuntime.get(context))
+                    session.setActive(true)
                 } catch (e: Exception) {}
             }
             override fun onKill(session: GeckoSession) {
                 try {
                     if (!session.isOpen) session.open(WyrixGeckoRuntime.get(context))
+                    session.setActive(true)
                 } catch (e: Exception) {}
             }
         }
     }
 
-    fun loadUri(uri: String) { session.loadUri(uri) }
+    fun loadUri(uri: String) {
+        if (!session.isOpen) {
+            session.open(WyrixGeckoRuntime.get(context))
+        }
+        session.setActive(true)
+        session.loadUri(uri)
+    }
+
     fun goBack() { if (_canGoBack.value) session.goBack() }
     fun goForward() { if (_canGoForward.value) session.goForward() }
     fun reload() { session.reload() }

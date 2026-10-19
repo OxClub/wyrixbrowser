@@ -33,7 +33,7 @@ fun BrowserToolbar(
     onToggleShield: () -> Unit,
     onOpenCommandCenter: () -> Unit
 ) {
-    var text by remember(url) { mutableStateOf(url) }
+    var text by remember(url) { mutableStateOf(if (url == "about:blank") "" else url) }
     var isEditing by remember { mutableStateOf(false) }
 
     Column(
@@ -72,28 +72,57 @@ fun BrowserToolbar(
                     .height(44.dp)
                     .background(WyrixPanel, RoundedCornerShape(12.dp))
                     .border(1.dp, WyrixBorder, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 if (isEditing) {
-                    TextField(
-                        value = text,
-                        onValueChange = { text = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedTextColor = WyrixTextPrimary,
-                            unfocusedTextColor = WyrixTextPrimary,
-                            cursorColor = WyrixNeonBlue
-                        ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                        keyboardActions = KeyboardActions(onGo = {
-                            isEditing = false
-                            onNavigate(text)
-                        })
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextField(
+                            value = text,
+                            onValueChange = { text = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedTextColor = WyrixTextPrimary,
+                                unfocusedTextColor = WyrixTextPrimary,
+                                cursorColor = WyrixNeonBlue
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = {
+                                    isEditing = false
+                                    if (text.isNotBlank()) onNavigate(text)
+                                },
+                                onGo = {
+                                    isEditing = false
+                                    if (text.isNotBlank()) onNavigate(text)
+                                },
+                                onDone = {
+                                    isEditing = false
+                                    if (text.isNotBlank()) onNavigate(text)
+                                }
+                            )
+                        )
+                        if (text.isNotEmpty()) {
+                            IconButton(onClick = { text = "" }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = WyrixTextDisabled, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        IconButton(
+                            onClick = {
+                                isEditing = false
+                                if (text.isNotBlank()) onNavigate(text)
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.ArrowForward, contentDescription = "Go", tint = WyrixNeonBlue, modifier = Modifier.size(20.dp))
+                        }
+                    }
                 } else {
                     Row(
                         modifier = Modifier
@@ -109,8 +138,8 @@ fun BrowserToolbar(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = text.ifEmpty { "Search or enter address" },
-                            color = if (text.isEmpty()) WyrixTextDisabled else WyrixTextPrimary,
+                            text = if (text.isBlank() || text == "about:blank") "Search or enter address" else text,
+                            color = if (text.isBlank() || text == "about:blank") WyrixTextDisabled else WyrixTextPrimary,
                             fontSize = 14.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

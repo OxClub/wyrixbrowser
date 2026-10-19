@@ -1,5 +1,6 @@
 package com.wyrix.browser.browser.engine
 
+import android.view.ViewGroup
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -16,8 +17,10 @@ fun GeckoViewHost(
     AndroidView(
         factory = { context ->
             GeckoView(context).apply {
-                // Jetpack Compose ke sath TextureView bilkul stable chalta hai
-                setViewBackend(GeckoView.BACKEND_TEXTURE_VIEW)
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
                 setSession(session)
             }
         },
@@ -27,6 +30,7 @@ fun GeckoViewHost(
                     view.releaseSession()
                     view.setSession(session)
                 }
+                session.setActive(true)
             } catch (e: Exception) {}
         },
         onRelease = { view ->

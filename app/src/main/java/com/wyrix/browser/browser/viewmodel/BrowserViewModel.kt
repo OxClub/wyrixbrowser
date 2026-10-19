@@ -46,8 +46,9 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 dao.getNormalTabs().firstOrNull()?.let { savedTabs ->
-                    if (savedTabs.isNotEmpty()) {
-                        savedTabs.forEach { tabEntity ->
+                    val validTabs = savedTabs.filter { it.url.isNotBlank() && it.url != "about:blank" }
+                    if (validTabs.isNotEmpty()) {
+                        validTabs.forEach { tabEntity ->
                             createTabInternal(
                                 id = tabEntity.id,
                                 url = tabEntity.url,
@@ -55,7 +56,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                                 workspace = try { Workspace.valueOf(tabEntity.workspaceId) } catch (e: Exception) { Workspace.PERSONAL }
                             )
                         }
-                        _activeTabId.value = savedTabs.first().id
+                        _activeTabId.value = validTabs.first().id
                     } else {
                         createNewTab("https://start.duckduckgo.com", isPrivate = false)
                     }
@@ -120,6 +121,8 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
             if (url.contains(".") && !url.contains(" ")) "https://$url"
             else "https://duckduckgo.com/?q=${java.net.URLEncoder.encode(url, "UTF-8")}"
         } else url
+
+        _tabs.update { list -> list.map { if (it.id == currentId) it.copy(url = formattedUrl) else it } }
         sessionPool[currentId]?.loadUri(formattedUrl)
     }
 
@@ -163,6 +166,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun handleUrlUpdate(tabId: String, url: String, isPrivate: Boolean) {
+        if (url == "about:blank") return
         _tabs.update { list -> list.map { if (it.id == tabId) it.copy(url = url) else it } }
         if (!isPrivate) {
             viewModelScope.launch {
@@ -185,6 +189,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun persistTab(tab: TabModel) {
+        if (tab.url == "about:blank") return
         viewModelScope.launch {
             try {
                 dao.insertOrUpdateTab(

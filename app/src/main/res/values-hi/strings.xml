@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WYRIX ब्राउज़र</string>
+    <string name="tab_galaxy">टैब गैलेक्सी</string>
+    <string name="bookmarks">बुकमार्क</string>
+    <string name="history">इतिहास</string>
+    <string name="downloads">डाउनलोड</string>
+    <string name="settings">सेटिंग्स</string>
+    <string name="shield">शील्ड सुरक्षा</string>
+    <string name="new_tab">नया टैब</string>
+    <string name="private_tab">प्राइवेट टैब</string>
+</resources>

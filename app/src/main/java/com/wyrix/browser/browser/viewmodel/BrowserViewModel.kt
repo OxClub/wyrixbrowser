@@ -6,12 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.wyrix.browser.browser.engine.WyrixSessionHolder
 import com.wyrix.browser.browser.model.TabModel
 import com.wyrix.browser.browser.model.Workspace
-import com.wyrix.browser.core.database.BookmarkEntity
-import com.wyrix.browser.core.database.HistoryEntity
-import com.wyrix.browser.core.database.TabEntity
-import com.wyrix.browser.core.database.WyrixDatabase
+import com.wyrix.browser.core.database.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import org.mozilla.geckoview.GeckoSessionSettings
 import java.util.UUID
 
 class BrowserViewModel(application: Application) : AndroidViewModel(application) {
@@ -33,7 +31,13 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     private val _shieldEnabled = MutableStateFlow(true)
     val shieldEnabled: StateFlow<Boolean> = _shieldEnabled.asStateFlow()
 
-    // 5000ms (5 sec) timeout hatakar SharingStarted.Eagerly kiya gaya
+    private val _desktopMode = MutableStateFlow(false)
+    val desktopMode: StateFlow<Boolean> = _desktopMode.asStateFlow()
+
+    val bookmarks: Flow<List<BookmarkEntity>> = dao.getAllBookmarks()
+    val history: Flow<List<HistoryEntity>> = dao.getAllHistory()
+    val downloads: Flow<List<DownloadEntity>> = dao.getAllDownloads()
+
     val activeTab: StateFlow<TabModel?> = combine(_tabs, _activeTabId) { tabs, activeId ->
         tabs.find { it.id == activeId }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -94,9 +98,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         )
         _tabs.update { it + newTab }
 
-        if (!isPrivate) {
-            persistTab(newTab)
-        }
+        if (!isPrivate) persistTab(newTab)
     }
 
     fun selectTab(tabId: String) { _activeTabId.value = tabId }
@@ -124,11 +126,40 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     fun switchWorkspace(workspace: Workspace) { _currentWorkspace.value = workspace }
     fun toggleShield() { _shieldEnabled.update { !it } }
 
+    fun toggleDesktopMode() {
+        _desktopMode.update { !it }
+        val currentId = _activeTabId.value ?: return
+        val session = sessionPool[currentId]?.session ?: return
+        session.settings.userAgentMode = if (_desktopMode.value) {
+            GeckoSessionSettings.USER_AGENT_MODE_DESKTOP
+        } else {
+            GeckoSessionSettings.USER_AGENT_MODE_MOBILE
+        }
+        session.reload()
+    }
+
+    fun findInPage(text: String) {
+        val currentId = _activeTabId.value ?: return
+        sessionPool[currentId]?.session?.finder?.find(text, 0)
+    }
+
     fun bookmarkCurrentPage() {
         val current = activeTab.value ?: return
         viewModelScope.launch {
             dao.insertBookmark(BookmarkEntity(title = current.title, url = current.url))
         }
+    }
+
+    fun deleteBookmark(bookmark: BookmarkEntity) {
+        viewModelScope.launch { dao.deleteBookmark(bookmark) }
+    }
+
+    fun deleteHistoryItem(id: Long) {
+        viewModelScope.launch { dao.deleteHistory(id) }
+    }
+
+    fun clearAllHistory() {
+        viewModelScope.launch { dao.clearHistory() }
     }
 
     private fun handleUrlUpdate(tabId: String, url: String, isPrivate: Boolean) {

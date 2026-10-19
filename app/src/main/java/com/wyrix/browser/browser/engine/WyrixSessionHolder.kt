@@ -46,7 +46,12 @@ class WyrixSessionHolder(
         }
 
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
-            override fun onLocationChange(session: GeckoSession, url: String?, perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>) {
+            override fun onLocationChange(
+                session: GeckoSession,
+                url: String?,
+                perms: List<GeckoSession.PermissionDelegate.ContentPermission>,
+                hasUserGesture: Boolean
+            ) {
                 url?.let { onUrlChanged(it) }
             }
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {

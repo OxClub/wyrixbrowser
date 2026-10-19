@@ -11,24 +11,28 @@ fun GeckoViewHost(
     session: GeckoSession?,
     modifier: Modifier = Modifier
 ) {
+    if (session == null) return
+
     AndroidView(
         factory = { context ->
             GeckoView(context).apply {
-                session?.let { setSession(it) }
+                // Jetpack Compose ke sath TextureView bilkul stable chalta hai
+                setViewBackend(GeckoView.BACKEND_TEXTURE_VIEW)
+                setSession(session)
             }
         },
         update = { view ->
-            if (view.session != session) {
-                if (view.session != null) {
+            try {
+                if (view.session !== session) {
                     view.releaseSession()
+                    view.setSession(session)
                 }
-                session?.let { view.setSession(it) }
-            }
+            } catch (e: Exception) {}
         },
         onRelease = { view ->
-            if (view.session != null) {
+            try {
                 view.releaseSession()
-            }
+            } catch (e: Exception) {}
         },
         modifier = modifier
     )

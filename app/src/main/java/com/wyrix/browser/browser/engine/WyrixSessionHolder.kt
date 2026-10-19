@@ -10,7 +10,7 @@ import org.mozilla.geckoview.GeckoSessionSettings
 class WyrixSessionHolder(
     val tabId: String,
     val isPrivate: Boolean,
-    context: Context,
+    private val context: Context,
     private val onTitleChanged: (String) -> Unit,
     private val onUrlChanged: (String) -> Unit,
     private val onProgressChanged: (Int) -> Unit,
@@ -32,7 +32,9 @@ class WyrixSessionHolder(
 
         session = GeckoSession(settings)
         setupDelegates()
-        session.open(WyrixGeckoRuntime.get(context))
+        if (!session.isOpen) {
+            session.open(WyrixGeckoRuntime.get(context))
+        }
     }
 
     private fun setupDelegates() {
@@ -66,6 +68,16 @@ class WyrixSessionHolder(
             override fun onTitleChange(session: GeckoSession, title: String?) {
                 title?.let { onTitleChanged(it) }
             }
+            override fun onCrash(session: GeckoSession) {
+                try {
+                    if (!session.isOpen) session.open(WyrixGeckoRuntime.get(context))
+                } catch (e: Exception) {}
+            }
+            override fun onKill(session: GeckoSession) {
+                try {
+                    if (!session.isOpen) session.open(WyrixGeckoRuntime.get(context))
+                } catch (e: Exception) {}
+            }
         }
     }
 
@@ -74,5 +86,9 @@ class WyrixSessionHolder(
     fun goForward() { if (_canGoForward.value) session.goForward() }
     fun reload() { session.reload() }
     fun stop() { session.stop() }
-    fun close() { session.close() }
+    fun close() {
+        try {
+            if (session.isOpen) session.close()
+        } catch (e: Exception) {}
+    }
 }

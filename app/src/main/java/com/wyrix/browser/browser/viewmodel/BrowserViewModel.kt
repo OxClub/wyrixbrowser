@@ -33,26 +33,33 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     private val _shieldEnabled = MutableStateFlow(true)
     val shieldEnabled: StateFlow<Boolean> = _shieldEnabled.asStateFlow()
 
+    // 5000ms (5 sec) timeout hatakar SharingStarted.Eagerly kiya gaya
     val activeTab: StateFlow<TabModel?> = combine(_tabs, _activeTabId) { tabs, activeId ->
         tabs.find { it.id == activeId }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         viewModelScope.launch {
-            dao.getNormalTabs().firstOrNull()?.let { savedTabs ->
-                if (savedTabs.isNotEmpty()) {
-                    savedTabs.forEach { tabEntity ->
-                        createTabInternal(
-                            id = tabEntity.id,
-                            url = tabEntity.url,
-                            isPrivate = false,
-                            workspace = Workspace.valueOf(tabEntity.workspaceId)
-                        )
+            try {
+                dao.getNormalTabs().firstOrNull()?.let { savedTabs ->
+                    if (savedTabs.isNotEmpty()) {
+                        savedTabs.forEach { tabEntity ->
+                            createTabInternal(
+                                id = tabEntity.id,
+                                url = tabEntity.url,
+                                isPrivate = false,
+                                workspace = try { Workspace.valueOf(tabEntity.workspaceId) } catch (e: Exception) { Workspace.PERSONAL }
+                            )
+                        }
+                        _activeTabId.value = savedTabs.first().id
+                    } else {
+                        createNewTab("https://start.duckduckgo.com", isPrivate = false)
                     }
-                    _activeTabId.value = savedTabs.first().id
-                } else {
+                } ?: run {
                     createNewTab("https://start.duckduckgo.com", isPrivate = false)
                 }
+            } catch (e: Exception) {
+                createNewTab("https://start.duckduckgo.com", isPrivate = false)
             }
         }
     }
@@ -148,17 +155,19 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     private fun persistTab(tab: TabModel) {
         viewModelScope.launch {
-            dao.insertOrUpdateTab(
-                TabEntity(
-                    id = tab.id,
-                    title = tab.title,
-                    url = tab.url,
-                    isPrivate = tab.isPrivate,
-                    workspaceId = tab.workspace.name,
-                    groupId = null,
-                    position = 0
+            try {
+                dao.insertOrUpdateTab(
+                    TabEntity(
+                        id = tab.id,
+                        title = tab.title,
+                        url = tab.url,
+                        isPrivate = tab.isPrivate,
+                        workspaceId = tab.workspace.name,
+                        groupId = null,
+                        position = 0
+                    )
                 )
-            )
+            } catch (e: Exception) {}
         }
     }
 

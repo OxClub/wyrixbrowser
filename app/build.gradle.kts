@@ -18,8 +18,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
 
-        // सिर्फ आधुनिक 64-bit स्मार्टफोन्स (arm64-v8a) के लिए इंजन रखें
-        // इससे APK साइज 300MB से घटकर ~65MB हो जाएगा
+        // सिर्फ आपके और बाकी 99% फोन के लिए arm64-v8a रखें (बाकी 3 इंजन हटाएं)
         ndk {
             abiFilters.clear()
             abiFilters.add("arm64-v8a")
@@ -52,6 +51,16 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
+    }
+
+    packaging {
+        // C++ इंजन फाइलों को कंप्रेस करने का निर्देश (ताकि साइज 700MB न बने)
+        jniLibs {
+            useLegacyPackaging = true
+        }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
